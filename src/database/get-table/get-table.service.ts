@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import type { DataSeries } from '@learners-analytica/drashta-types-ts';
+import { requestTable } from './get-table.dto';
 @Injectable()
 export class GetTableService {
-    getDataBaseTable():DataSeries[]{
+    getDataBaseTable(request: requestTable):DataSeries[]{
         return []
     }
 }
