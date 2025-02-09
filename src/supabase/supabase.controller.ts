@@ -7,7 +7,7 @@ export class SupabaseController {
 
   @Get('get-struct-supabase')
   async getTableData() {
-    return this.supabaseService.getTableData();
+    return this.supabaseService.getTableStructData();
   }
 }
 

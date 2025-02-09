@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type {SupabaseClient} from '@supabase/supabase-js';
 import { createClient } from '@supabase/supabase-js';
+import type {TTableStructure} from '@learners-analytica/drashta-types-ts';
 import * as dotenv from 'dotenv';
 @Injectable()
 export class SupabaseService {
@@ -14,22 +15,24 @@ export class SupabaseService {
     this.supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
   }
 
-  async getTest() {
-    return {message:"Hello"}
+  async checkIfTableExists(tableName: string): Promise<boolean> {
+    const Tables:TTableStructure[] = await this.getTableStructData();
+    const tableNames: string[] = Tables.map((table) => table.table_name);
+    return Tables.some((table) => table.table_name === tableName);
   }
 
-  async getTableData() {
+  async getTableStructData():Promise<TTableStructure[]> {
     const { data, error } = await this.supabase
-      .from('information_schema.tables')
-      .select('table_name')
-      .eq('table_schema', 'public');
+      .from(process.env.VIEW_STRUCT)
+      .select('*')
 
     if (error) {
         
-      return error;
+      throw error;
     }
 
     return data;
   }
 
 }
+
