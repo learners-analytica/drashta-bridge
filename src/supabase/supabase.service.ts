@@ -36,8 +36,8 @@ export class SupabaseService {
   async getColumnNameFromTable(table:string):Promise<string[]>{
     const TableData = await this.getTableStructData()
     const ColumnsData = TableData.filter((tableData)=> tableData.table_name === table)
-    const Columns = ColumnsData.map((columnsData)=> columnsData.table_columns)
-    return Columns
+    const Columns = ColumnsData.map((columnsData)=> columnsData.table_columns).flat()
+    return Columns as string[];
   }
   async getTableData(table: string, size: number = 1000, columns: string[] = null): Promise<any> {
     const columnStr = columns ? columns.join(',') : '*';
