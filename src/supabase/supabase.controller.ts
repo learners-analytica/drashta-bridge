@@ -9,5 +9,10 @@ export class SupabaseController {
   async getTableData() {
     return this.supabaseService.getTableStructData();
   }
+
+  @Get('get-test-table-info')
+  async getTableInfo() {
+    return this.supabaseService.getColumnNameFromTable('contacts');
+  }
 }
 
