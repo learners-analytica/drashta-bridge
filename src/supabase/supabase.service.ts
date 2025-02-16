@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type {SupabaseClient} from '@supabase/supabase-js';
 import { AuthWeakPasswordError, createClient } from '@supabase/supabase-js';
-import type {TTableStructure, TColumnStructureHead, TColumnStructureMeta, TColumnStructureData} from '@learners-analytica/drashta-types-ts';
+import type {TTableStructure, TColumnStructureHead, TColumnStructureMeta, TColumnStructureData, TTableData, TDataArray} from '@learners-analytica/drashta-types-ts';
 import { AggregrateOperations } from '@learners-analytica/drashta-types-ts';
 import * as dotenv from 'dotenv';
 @Injectable()
@@ -58,6 +58,18 @@ export class SupabaseService {
     return data;
   }
 
+  async getMultiColumnDataObjectArray(table: string, size: number = 1000, columns: string|string[]): Promise<unknown[]> {
+    const columnList = Array.isArray(columns) ? columns : [columns];
+    const { data, error } = await this.supabase
+      .from(table)
+      .select(columnList.join(','))
+      .limit(size)
+    if (error) {
+      throw error;
+    }
+    return data;
+  }
+
   async getColumnDataValueArray(table:string, size:number = 1000, column:string):Promise<unknown[]>{
     const data = await this.getColumnDataObjectArray(table, size, column);
     return data.map((row) => row[column]);
@@ -88,7 +100,6 @@ export class SupabaseService {
       column_count: await this.getAggOperations(table, column, AggregrateOperations.COUNT),
       column_min: await this.getAggOperations(table, column, AggregrateOperations.MIN),
       column_max: await this.getAggOperations(table, column, AggregrateOperations.MAX),
-      //@ts-expect-error
       column_data_preview: await this.getColumnDataValueArray(table, 5, column)
     }
     return columnStructMeta;
@@ -119,6 +130,19 @@ export class SupabaseService {
       table_columns: await Promise.all(columns.map((column) => this.getColumnHead(table, column)))
     }
     return tableStructData
+  }
+
+  async getTableData(table:string):Promise<TTableData>{
+    const columns = await this.getColumnNamesFromTable(table)
+    const tableStructData:TTableData = {
+      table_name: table,
+      table_columns_data: await Promise.all(columns.map((column) => this.getColumnData(table, column)))
+    }
+    return tableStructData
+  }
+
+  async getTableDataRaw(table:string,columns:string[]):Promise<any[]>{
+    return await this.getMultiColumnDataObjectArray(table, 1000, columns)
   }
 }
 
