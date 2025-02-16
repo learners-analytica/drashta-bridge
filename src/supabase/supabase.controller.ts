@@ -5,37 +5,29 @@ import { SupabaseService } from './supabase.service';
 export class SupabaseController {
   constructor(private readonly supabaseService: SupabaseService) {}
 
-  @Get('get-struct-supabase')
-  async getTableStructData() {
-    return this.supabaseService.getTableStructData();
+  @Get('get-column-head')
+  async getColumnHead() {
+    return this.supabaseService.getColumnData("expense_request", "expense_amount")
   }
 
-  @Get('get-test-table-info')
+  @Get('get-database-schema')
   async getTableInfo() {
-    return this.supabaseService.getColumnStructData('expense_request','expense_name');
-  }
-  @Post('get-data-series')
-  async getDataSeriesFromTable(
-    @Body('table') table: string,
-    @Body('size') size: number = 1000,
-    @Body('column') column: string,
-  ) {
-    if (!table || !column) {
-      throw new Error('Table name and column name cannot be null or empty.');
-    }
-    return this.supabaseService.getDataSeriesFromTable(table, size, column);
+    return this.supabaseService.getTableStructData()
   }
 
-  @Post ('get-table-data')
-  async getTableData(
-    @Body('table') table: string,
-  ){
-    return this.supabaseService.getDataSeriesArrayFromTable(table);
+  @Get('get-table-column-name')
+  async getTableColumnNames() {
+    return this.supabaseService.getColumnNamesFromTable("expense_request")
   }
 
-  @Get('get-test-table-data')
-  async getTableTestData() {
-    return this.supabaseService.getDataSeriesArrayFromTable('expense_request',1000);
+  @Get('get-table-head')
+  async getTableHead(){
+    return this.supabaseService.getTableHead("expense_request")
+  }
+
+  @Get('get-table-data-raw')
+  async getTableDataRaw(){
+    return this.supabaseService.getColumnDataValueArray("expense_request",5,"expense_amount")
   }
 }
 

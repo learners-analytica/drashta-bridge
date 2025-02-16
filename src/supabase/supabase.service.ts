@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import type {SupabaseClient} from '@supabase/supabase-js';
-import { createClient } from '@supabase/supabase-js';
-import type {TDataSeries, TTableStructure, TTableColumnEntry} from '@learners-analytica/drashta-types-ts';
+import { AuthWeakPasswordError, createClient } from '@supabase/supabase-js';
+import type {TDataSeries, TTableStructure, TColumnStructureHead, TColumnStructureMeta, TColumnStructureData} from '@learners-analytica/drashta-types-ts';
+import { AggregrateOperations } from '@learners-analytica/drashta-types-ts';
 import * as dotenv from 'dotenv';
 @Injectable()
 export class SupabaseService {
@@ -33,10 +34,10 @@ export class SupabaseService {
     return data;
   }
 
-  async getColumnStructFromTable(table:string):Promise<TTableColumnEntry[]>{
+  async getColumnStructFromTable(table:string):Promise<TColumnStructureHead[]>{
     const TableData = await this.getTableStructData()
     const ColumnsData = TableData.filter((tableData)=> tableData.table_name === table)
-    const Columns:TTableColumnEntry[] = ColumnsData.map((columnsData)=> columnsData.table_columns).flat()
+    const Columns:TColumnStructureHead[] = ColumnsData.map((columnsData)=> columnsData.table_columns).flat()
     return Columns;
   }
 
@@ -46,7 +47,7 @@ export class SupabaseService {
     return ColumnNames
   }
 
-  async getColumnData(table: string, size: number = 1000, column: string): Promise<any> {
+  async getColumnDataObjectArray(table: string, size: number = 1000, column: string): Promise<unknown[]> {
     const { data, error } = await this.supabase
       .from(table)
       .select(column)
@@ -57,79 +58,68 @@ export class SupabaseService {
     return data;
   }
 
-  async getColumnCount(table:string,column:string):Promise<any>{
-    const { data, error, count } = await this.supabase
-      .from(table)
-      .select(`${column}.count()`)
-      .single();
-    if (error) {
-      throw error;
-    }
-    //@ts-expect-error
-    return data.count;
+  async getColumnDataValueArray(table:string, size:number = 1000, column:string):Promise<unknown[]>{
+    const data = await this.getColumnDataObjectArray(table, size, column);
+    return data.map((row) => row[column]);
   }
 
-  async getColumnAvg(table:string,column:string):Promise<any>{
+  async getAggOperations(table:string,column:string,operation:AggregrateOperations):Promise<number>{
     const { data, error } = await this.supabase
       .from(table)
-      .select(`${column}.avg()`)
+      .select(`${column}.${operation}()`)
       .single();
     if (error) {
+      console.log(error);
       return null;
     }
-    //@ts-expect-error
-    return data.avg;
+    return data[operation.toLowerCase()];
   }
 
-  async convertColumnDataToDataSeries(columnsData: any[], columnStructData: TTableColumnEntry, columnCount:number, columnAvg:number): Promise<TDataSeries> {
-    let dataSeries: TDataSeries = {
-      series_data: columnsData,
-      series_name: columnStructData.column_name,
-      series_type: columnStructData.column_type,
-      is_series_key: columnStructData.column_is_key === "YES",
-      series_count: columnStructData.column_is_key === "YES" ? null : columnCount,
-      series_mean: columnStructData.column_is_key === "YES" ? null : columnAvg
-    };
-    return dataSeries;
-  }
-
-  async getColumnStructData(table:string,column:string): Promise<TTableColumnEntry> {
-    const tableColumnsStructData:TTableColumnEntry[] = await this.getColumnStructFromTable(table)
-    const columnStructData:TTableColumnEntry = tableColumnsStructData.filter((columnStructData) => columnStructData.column_name === column)[0]
+  async getColumnHead(table:string,column:string):Promise<TColumnStructureHead>{
+    const tableColumnsStructData:TColumnStructureHead[] = await this.getColumnStructFromTable(table)
+    const columnStructData:TColumnStructureHead = tableColumnsStructData.filter((columnStructData) => columnStructData.column_name === column)[0]
     return columnStructData;
   }
 
-  async getDataSeriesArrayFromTable(table: string, size: number = 1000, columns: string[] = null): Promise<TDataSeries[]> {
-    const dataSeriesArray: TDataSeries[] = [];
-    const columnNames = columns || await this.getColumnNamesFromTable(table);
-
-    for (const column of columnNames) {
-      try {
-        const columnsData = await this.getColumnData(table, size, column);
-        const columnStructData = await this.getColumnStructData(table, column);
-        const columnCount = await this.getColumnCount(table, column);
-        const columnAvg = await this.getColumnAvg(table, column);
-        const dataSeries = await this.convertColumnDataToDataSeries(columnsData, columnStructData, columnCount, columnAvg);
-        dataSeriesArray.push(dataSeries);
-      } catch (error) {
-        console.error(`Error processing column ${column}:`, error);
-      }
+  async getColumnMeta(table:string,column:string):Promise<TColumnStructureMeta>{
+    const tableColumnsStructData:TColumnStructureHead = await this.getColumnHead(table,column)
+    const columnStructMeta:TColumnStructureMeta = {
+      ...tableColumnsStructData,
+      column_mean: await this.getAggOperations(table, column, AggregrateOperations.AVG),
+      column_count: await this.getAggOperations(table, column, AggregrateOperations.COUNT),
+      column_min: await this.getAggOperations(table, column, AggregrateOperations.MIN),
+      column_max: await this.getAggOperations(table, column, AggregrateOperations.MAX),
+      //@ts-expect-error
+      column_data_preview: await this.getColumnDataValueArray(table, 5, column)
     }
-    return dataSeriesArray;
+    return columnStructMeta;
   }
 
-  async getDataSeriesFromTable(table: string, size: number = 100, column: string): Promise<TDataSeries> {
-    if (!table || !column) {
-      throw new Error('Table name and column name cannot be null or empty.');
+  async getColumnData(table:string,column:string,size:number = 1000):Promise<TColumnStructureData[]>{
+    const tableColumnsStructMeta:TColumnStructureMeta = await this.getColumnMeta(table,column);
+    const columnStructData:TColumnStructureData = {
+      ...tableColumnsStructMeta,
+      column_data: await this.getColumnDataValueArray(table, size, column)
+    };
+    return [columnStructData];
+  }
+
+  async getTableHead(table:string):Promise<TTableStructure>{
+    const columns = await this.getColumnNamesFromTable(table)
+    const tableStructData:TTableStructure = {
+      table_name: table,
+      table_columns: await Promise.all(columns.map((column) => this.getColumnHead(table, column)))
     }
-    
-    const columnsData = (await this.getColumnData(table, size, column)).map((row) => row[column]);
-    const columnStructData = await this.getColumnStructData(table, column);
-    const columnCount = await this.getColumnCount(table, column);
-    const columnAvg = await this.getColumnAvg(table, column);
-    const dataSeries = await this.convertColumnDataToDataSeries(columnsData, columnStructData, columnCount, columnAvg);
-    
-    return dataSeries;
+    return tableStructData
+  }
+
+  async getTableMeta(table:string):Promise<TTableStructure>{
+    const columns = await this.getColumnNamesFromTable(table)
+    const tableStructData:TTableStructure = {
+      table_name: table,
+      table_columns: await Promise.all(columns.map((column) => this.getColumnHead(table, column)))
+    }
+    return tableStructData
   }
 }
 
