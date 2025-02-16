@@ -117,5 +117,19 @@ export class SupabaseService {
     }
     return dataSeriesArray;
   }
+
+  async getDataSeriesFromTable(table: string, size: number = 100, column: string): Promise<TDataSeries> {
+    if (!table || !column) {
+      throw new Error('Table name and column name cannot be null or empty.');
+    }
+    
+    const columnsData = (await this.getColumnData(table, size, column)).map((row) => row[column]);
+    const columnStructData = await this.getColumnStructData(table, column);
+    const columnCount = await this.getColumnCount(table, column);
+    const columnAvg = await this.getColumnAvg(table, column);
+    const dataSeries = await this.convertColumnDataToDataSeries(columnsData, columnStructData, columnCount, columnAvg);
+    
+    return dataSeries;
+  }
 }
 

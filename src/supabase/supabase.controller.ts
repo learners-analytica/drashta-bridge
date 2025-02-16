@@ -14,14 +14,23 @@ export class SupabaseController {
   async getTableInfo() {
     return this.supabaseService.getColumnStructData('expense_request','expense_name');
   }
-
-  @Post('get-table-data')
-  async getTableData(
+  @Post('get-data-series')
+  async getDataSeriesFromTable(
     @Body('table') table: string,
     @Body('size') size: number = 1000,
-    @Body('columns') columns: string[] = null,
+    @Body('column') column: string,
   ) {
-    return this.supabaseService.getDataSeriesArrayFromTable(table, size, columns);
+    if (!table || !column) {
+      throw new Error('Table name and column name cannot be null or empty.');
+    }
+    return this.supabaseService.getDataSeriesFromTable(table, size, column);
+  }
+
+  @Post ('get-table-data')
+  async getTableData(
+    @Body('table') table: string,
+  ){
+    return this.supabaseService.getDataSeriesArrayFromTable(table);
   }
 
   @Get('get-test-table-data')
