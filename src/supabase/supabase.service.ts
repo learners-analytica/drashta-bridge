@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type {SupabaseClient} from '@supabase/supabase-js';
 import { AuthWeakPasswordError, createClient } from '@supabase/supabase-js';
-import type {TDataSeries, TTableStructure, TColumnStructureHead, TColumnStructureMeta, TColumnStructureData} from '@learners-analytica/drashta-types-ts';
+import type {TTableStructure, TColumnStructureHead, TColumnStructureMeta, TColumnStructureData} from '@learners-analytica/drashta-types-ts';
 import { AggregrateOperations } from '@learners-analytica/drashta-types-ts';
 import * as dotenv from 'dotenv';
 @Injectable()
@@ -69,7 +69,6 @@ export class SupabaseService {
       .select(`${column}.${operation}()`)
       .single();
     if (error) {
-      console.log(error);
       return null;
     }
     return data[operation.toLowerCase()];
@@ -95,13 +94,13 @@ export class SupabaseService {
     return columnStructMeta;
   }
 
-  async getColumnData(table:string,column:string,size:number = 1000):Promise<TColumnStructureData[]>{
+  async getColumnData(table:string,column:string,size:number = 1000):Promise<TColumnStructureData>{
     const tableColumnsStructMeta:TColumnStructureMeta = await this.getColumnMeta(table,column);
     const columnStructData:TColumnStructureData = {
       ...tableColumnsStructMeta,
       column_data: await this.getColumnDataValueArray(table, size, column)
     };
-    return [columnStructData];
+    return columnStructData;
   }
 
   async getTableHead(table:string):Promise<TTableStructure>{
