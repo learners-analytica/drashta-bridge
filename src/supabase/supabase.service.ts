@@ -1,12 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import type {SupabaseClient} from '@supabase/supabase-js';
-import { AuthWeakPasswordError, createClient } from '@supabase/supabase-js';
-import type {TTableStructure, TColumnStructureHead, TColumnStructureMeta, TColumnStructureData, TTableData, TDataArray} from '@learners-analytica/drashta-types-ts';
-import { AggregrateOperations } from '@learners-analytica/drashta-types-ts';
+import { createClient } from '@supabase/supabase-js';
+import { TDataArray, TTableStructure, TDataSeriesHead, TTableMetaData, AggregationOperations, TDataSeriesMetadata, TDataSeries, TDataSeriesRaw } from '@learners-analytica/drashta-types-ts';
 import * as dotenv from 'dotenv';
+
+type TDatabaseStructure = TTableStructure[];
 @Injectable()
 export class SupabaseService {
-    private supabase: SupabaseClient;
+  private supabase: SupabaseClient;
 
   constructor() {
     // Replace these values with your Supabase project URL and public API key
@@ -16,12 +17,7 @@ export class SupabaseService {
     this.supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
   }
 
-  async checkIfTableExists(tableName: string): Promise<boolean> {
-    const Tables: TTableStructure[] = await this.getTableStructData();
-    return Tables.some((table) => table.table_name === tableName);
-  }
-
-  async getTableStructData():Promise<TTableStructure[]> {
+  async getDatabaseStructure():Promise<TDatabaseStructure> {
     const { data, error } = await this.supabase
       .from(process.env.VIEW_STRUCT)
       .select('*')
@@ -34,23 +30,28 @@ export class SupabaseService {
     return data;
   }
 
-  async getColumnStructFromTable(table:string):Promise<TColumnStructureHead[]>{
-    const TableData = await this.getTableStructData()
-    const ColumnsData = TableData.filter((tableData)=> tableData.table_name === table)
-    const Columns:TColumnStructureHead[] = ColumnsData.map((columnsData)=> columnsData.table_columns).flat()
-    return Columns;
+  async getTableHeadData(table:string):Promise<TTableStructure> {
+    const DatabaseStructure:TDatabaseStructure = await this.getDatabaseStructure();
+    const tableHeadData:TTableStructure = DatabaseStructure.find(table_head_data => table_head_data.table_name === table);
+    return tableHeadData;
   }
 
-  async getColumnNamesFromTable(table:string):Promise<string[]>{
-    const ColumnsData = await this.getColumnStructFromTable(table)
-    const ColumnNames:string[] = ColumnsData.map((columnsData)=> columnsData.column_name)
-    return ColumnNames
+  private async getColumnsHeadData(table:string):Promise<TDataSeriesHead[]> {
+    const tableHeadData:TTableStructure = await this.getTableHeadData(table);
+    const columns = tableHeadData.table_column_head_data;
+    return columns;
   }
 
-  async getColumnDataObjectArray(table: string, size: number = 1000, column: string): Promise<unknown[]> {
+  private async getColumnNames(table:string):Promise<string[]> {
+    const columnsHeadData:TDataSeriesHead[] = await this.getColumnsHeadData(table);
+    return columnsHeadData.map((columnsHeadData:TDataSeriesHead) => columnsHeadData.column_name);
+  }
+
+  private async getDataAsObjectArray(table:string, column:string[], size:number=100):Promise<TDataArray> {
+    const column_list:string = column.map((value) => `"${value}"`).join(',');
     const { data, error } = await this.supabase
       .from(table)
-      .select(column)
+      .select(column_list)
       .limit(size)
     if (error) {
       throw error;
@@ -58,91 +59,81 @@ export class SupabaseService {
     return data;
   }
 
-  async getMultiColumnDataObjectArray(table: string, size: number = 1000, columns: string|string[]): Promise<unknown[]> {
-    const columnList = Array.isArray(columns) ? columns : [columns];
-    const { data, error } = await this.supabase
-      .from(table)
-      .select(columnList.join(','))
-      .limit(size)
-    if (error) {
-      throw error;
-    }
-    return data;
-  }
-
-  async getColumnDataValueArray(table:string, size:number = 1000, column:string):Promise<unknown[]>{
-    const data = await this.getColumnDataObjectArray(table, size, column);
+  async getDataAsValueArray(table:string,column:string,size:number=100):Promise<TDataArray>{
+    const data = await this.getDataAsObjectArray(table, [column], size);
     return data.map((row) => row[column]);
   }
 
-  async getAggOperations(table:string,column:string,operation:AggregrateOperations):Promise<number>{
+  private async getAggData(table:string,column, operation:AggregationOperations):Promise<number> {
     const { data, error } = await this.supabase
       .from(table)
       .select(`${column}.${operation}()`)
-      .single();
-    if (error) {
-      return null;
+      .single()
+      if (error) {
+        return null
+      }
+      return data[operation.toLowerCase()]
+  }
+
+  private async getColumnHeadData(table:string, column_name: string): Promise<TDataSeriesHead | undefined> {
+    const columnsHeadData:TDataSeriesHead[] = await this.getColumnsHeadData(table)
+    return columnsHeadData.find((columnData) => columnData.column_name === column_name);
+  }
+
+  async getColumnData(table: string, columns: string[], size: number = 100): Promise<TDataArray> {
+    const tableColumns = await this.getColumnNames(table);
+    for (const col of columns) {
+      if (!tableColumns.includes(col)) {
+        throw new Error(`Column ${col} does not exist in table ${table}`);
+      }
     }
-    return data[operation.toLowerCase()];
+    return this.getDataAsObjectArray(table, columns, size);
   }
 
-  async getColumnHead(table:string,column:string):Promise<TColumnStructureHead>{
-    const tableColumnsStructData:TColumnStructureHead[] = await this.getColumnStructFromTable(table)
-    const columnStructData:TColumnStructureHead = tableColumnsStructData.filter((columnStructData) => columnStructData.column_name === column)[0]
-    return columnStructData;
-  }
-
-  async getColumnMeta(table:string,column:string):Promise<TColumnStructureMeta>{
-    const tableColumnsStructData:TColumnStructureHead = await this.getColumnHead(table,column)
-    const columnStructMeta:TColumnStructureMeta = {
-      ...tableColumnsStructData,
-      column_mean: await this.getAggOperations(table, column, AggregrateOperations.AVG),
-      column_count: await this.getAggOperations(table, column, AggregrateOperations.COUNT),
-      column_min: await this.getAggOperations(table, column, AggregrateOperations.MIN),
-      column_max: await this.getAggOperations(table, column, AggregrateOperations.MAX),
-      column_data_preview: await this.getColumnDataValueArray(table, 5, column)
+  async getColumnDataRaw(table:string,column:string,size:number=100):Promise<TDataSeriesRaw>{
+    const head = await this.getColumnHeadData(table, column);
+    const data = await this.getDataAsValueArray(table, column, size);
+    const columnDataRaw:TDataSeriesRaw = {
+      ...head,
+      column_data:data
     }
-    return columnStructMeta;
+    return columnDataRaw
   }
 
-  async getColumnData(table:string,column:string,size:number = 1000):Promise<TColumnStructureData>{
-    const tableColumnsStructMeta:TColumnStructureMeta = await this.getColumnMeta(table,column);
-    const columnStructData:TColumnStructureData = {
-      ...tableColumnsStructMeta,
-      column_data: await this.getColumnDataValueArray(table, size, column)
+  private async getColumnMeta(table:string,column:string):Promise<TDataSeriesMetadata>{
+    const columnMeta:TDataSeriesMetadata = {
+      column_avg: await this.getAggData(table,column,AggregationOperations.AVG),
+      column_count: await this.getAggData(table,column,AggregationOperations.COUNT),
+      column_max: await this.getAggData(table,column,AggregationOperations.MAX),
+      column_min:await this.getAggData(table,column,AggregationOperations.MIN)
+    }
+    return columnMeta
+  }
+
+  async getTableMetaData(table: string): Promise<TTableMetaData> {
+    const columns: string[] = await this.getColumnNames(table);
+    const dataSeries: TDataSeries[] = [];
+    for (const column of columns) {
+      const columnHead:TDataSeriesHead = await this.getColumnHeadData(table, column);
+      const columnMeta:TDataSeriesMetadata = await this.getColumnMeta(table, column);
+      const columnDataPreview:unknown[] = await this.getColumnData(table, [column], 5);
+      const dataSeriesItem: TDataSeries = {
+        ...columnHead,
+        column_avg: columnMeta.column_avg,
+        column_count: columnMeta.column_count,
+        column_max: columnMeta.column_max,
+        column_min: columnMeta.column_min,
+        column_data: columnDataPreview
+      };
+  
+      dataSeries.push(dataSeriesItem);
+    }
+  
+    return {
+      table_name: table,
+      table_data_series: dataSeries
     };
-    return columnStructData;
   }
-
-  async getTableHead(table:string):Promise<TTableStructure>{
-    const columns = await this.getColumnNamesFromTable(table)
-    const tableStructData:TTableStructure = {
-      table_name: table,
-      table_columns: await Promise.all(columns.map((column) => this.getColumnHead(table, column)))
-    }
-    return tableStructData
-  }
-
-  async getTableMeta(table:string):Promise<TTableStructure>{
-    const columns = await this.getColumnNamesFromTable(table)
-    const tableStructData:TTableStructure = {
-      table_name: table,
-      table_columns: await Promise.all(columns.map((column) => this.getColumnHead(table, column)))
-    }
-    return tableStructData
-  }
-
-  async getTableData(table:string):Promise<TTableData>{
-    const columns = await this.getColumnNamesFromTable(table)
-    const tableStructData:TTableData = {
-      table_name: table,
-      table_columns_data: await Promise.all(columns.map((column) => this.getColumnData(table, column)))
-    }
-    return tableStructData
-  }
-
-  async getTableDataRaw(table:string,columns:string[]):Promise<any[]>{
-    return await this.getMultiColumnDataObjectArray(table, 1000, columns)
-  }
+  
 }
 
