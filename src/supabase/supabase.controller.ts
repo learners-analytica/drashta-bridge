@@ -24,9 +24,12 @@ export class SupabaseController {
     return this.supabaseService.getTableHeadData(table);
   }
 
-  @Get('test')
-  async test(){
-    return this.supabaseService.getTableMetaData('contacts')
+  @Post('get-table-data')
+  async getTableData(
+    @Body('table') table: string,
+    @Body('size') size: number,
+    @Body('column') column:string) {
+    return this.supabaseService.getColumnDataRaw(table,column,size);
   }
 }
 
