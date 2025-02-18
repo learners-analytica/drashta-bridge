@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type {SupabaseClient} from '@supabase/supabase-js';
 import { createClient } from '@supabase/supabase-js';
-import { TDataArray, TTableStructure, TDataSeriesHead, TTableMetaData, AggregationOperations, TDataSeriesMetadata, TDataSeries, TDataSeriesRaw } from '@learners-analytica/drashta-types-ts';
+import { TDataArray, TTableStructure, TDataSeriesHead, TTableMetaData, AggregationOperations, TDataSeriesMetadata, TDataSeries, TDataSeriesRaw, TColumnNames } from '@learners-analytica/drashta-types-ts';
 import * as dotenv from 'dotenv';
 
 type TDatabaseStructure = TTableStructure[];
@@ -42,7 +42,7 @@ export class SupabaseService {
     return columns;
   }
 
-  private async getColumnNames(table:string):Promise<string[]> {
+  private async getColumnNames(table:string):Promise<TColumnNames> {
     const columnsHeadData:TDataSeriesHead[] = await this.getColumnsHeadData(table);
     return columnsHeadData.map((columnsHeadData:TDataSeriesHead) => columnsHeadData.column_name);
   }
@@ -75,7 +75,7 @@ export class SupabaseService {
       return data[operation.toLowerCase()]
   }
 
-  private async getColumnHeadData(table:string, column_name: string): Promise<TDataSeriesHead | undefined> {
+  private async getColumnHeadData(table:string, column_name: string): Promise<TDataSeriesHead> {
     const columnsHeadData:TDataSeriesHead[] = await this.getColumnsHeadData(table)
     return columnsHeadData.find((columnData) => columnData.column_name === column_name);
   }
