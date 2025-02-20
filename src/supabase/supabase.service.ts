@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type {SupabaseClient} from '@supabase/supabase-js';
 import { createClient } from '@supabase/supabase-js';
-import { TDataArray, TTableStructure, TDataSeriesHead, TTableMetaData, AggregationOperations, TDataSeriesMetadata, TDataSeries, TDataSeriesRaw, TColumnNames } from '@learners-analytica/drashta-types-ts';
+import { TDataArray, TTableStructure, TDataSeriesHead, TTableMetaData, AggregationOperations, TDataSeriesMetadata, TDataSeries, TDataSeriesRaw, TColumnNames, TTableData } from '@learners-analytica/drashta-types-ts';
 import * as dotenv from 'dotenv';
 
 type TDatabaseStructure = TTableStructure[];
@@ -47,7 +47,8 @@ export class SupabaseService {
     return columnsHeadData.map((columnsHeadData:TDataSeriesHead) => columnsHeadData.column_name);
   }
 
-  private async getDataAsObjectArray(table:string, column:string[], size:number=100):Promise<TDataArray> {
+
+  private async getColumnAsObjectArray(table:string, column:string[], size:number=100):Promise<TDataArray> {
     const column_list:string = column.map((value) => `"${value}"`).join(',');
     const { data, error } = await this.supabase
       .from(table)
@@ -60,7 +61,7 @@ export class SupabaseService {
   }
 
   async getDataAsValueArray(table:string,column:string,size:number=100):Promise<TDataArray>{
-    const data = await this.getDataAsObjectArray(table, [column], size);
+    const data = await this.getColumnAsObjectArray(table, [column], size);
     return data.map((row) => row[column]);
   }
 
@@ -87,7 +88,7 @@ export class SupabaseService {
         throw new Error(`Column ${col} does not exist in table ${table}`);
       }
     }
-    return this.getDataAsObjectArray(table, columns, size);
+    return this.getColumnAsObjectArray(table, columns, size);
   }
 
   async getColumnDataRaw(table:string,column:string,size:number=100):Promise<TDataSeriesRaw>{
@@ -133,6 +134,14 @@ export class SupabaseService {
       table_name: table,
       table_data_series: dataSeries
     };
+  }
+
+  async getTableData(table:string,columns:string[],size:number=100):Promise<TTableData>{
+    const table_data:TTableData = {
+      table_name:table,
+      table_data_series:await this.getColumnAsObjectArray(table,columns,size)
+    }
+    return table_data
   }
   
 }

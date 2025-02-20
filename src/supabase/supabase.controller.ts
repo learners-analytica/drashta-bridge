@@ -31,5 +31,14 @@ export class SupabaseController {
     @Body('column') column:string) {
     return this.supabaseService.getColumnDataRaw(table,column,size);
   }
+
+  @Post('get-table-data-raw')
+  async getTableDataRaw(
+    @Body("table") table:string,
+    @Body("columns") columns:string[],
+    @Body("size") size:number) 
+  {
+    return this.supabaseService.getTableData(table,columns,size)
+  }
 }
 
