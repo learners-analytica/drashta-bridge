@@ -48,15 +48,21 @@ export class SupabaseService {
   }
 
 
-  private async getColumnAsObjectArray(table:string, column:string[], size:number=100):Promise<TDataArray> {
-    const column_list:string = column.map((value) => `"${value}"`).join(',');
+  private async getColumnAsObjectArray(table: string, column: string[], size: number = 100): Promise<TDataArray> {
+    if (!Array.isArray(column)) {
+      throw new Error("The 'column' parameter must be an array.");
+    }
+  
+    const column_list: string = column.map((value) => `"${value}"`).join(',');
     const { data, error } = await this.supabase
       .from(table)
       .select(column_list)
-      .limit(size)
+      .limit(size);
+    
     if (error) {
       throw error;
     }
+  
     return data;
   }
 
@@ -112,12 +118,13 @@ export class SupabaseService {
   }
 
   async getTableMetaData(table: string): Promise<TTableMetaData> {
+    const PREVIEW_DATA_SIZE:number = 5;
     const columns: string[] = await this.getColumnNames(table);
     const dataSeries: TDataSeries[] = [];
     for (const column of columns) {
       const columnHead:TDataSeriesHead = await this.getColumnHeadData(table, column);
       const columnMeta:TDataSeriesMetadata = await this.getColumnMeta(table, column);
-      const columnDataPreview:unknown[] = await this.getColumnData(table, [column], 5);
+      const columnDataPreview:unknown[] = await this.getColumnData(table, [column], PREVIEW_DATA_SIZE);
       const dataSeriesItem: TDataSeries = {
         ...columnHead,
         column_avg: columnMeta.column_avg,
@@ -139,6 +146,7 @@ export class SupabaseService {
   async getTableData(table:string,columns:string[],size:number=100):Promise<TTableData>{
     const table_data:TTableData = {
       table_name:table,
+      //@ts-expect-error
       table_data_series:await this.getColumnAsObjectArray(table,columns,size)
     }
     return table_data
