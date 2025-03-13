@@ -146,7 +146,6 @@ export class SupabaseService {
   async getTableData(table:string,columns:string[],size:number=100):Promise<TTableData>{
     const table_data:TTableData = {
       table_name:table,
-      //@ts-expect-error
       table_data_series:await this.getColumnAsObjectArray(table,columns,size)
     }
     return table_data
