@@ -47,5 +47,10 @@ export class SupabaseController {
   {
     return this.supabaseService.getTableData(table,columns,size)
   }
+
+  @Get('get-table-list')
+  async getTableList(){
+    return this.supabaseService.getDatabaseTables()
+  }
 }
 

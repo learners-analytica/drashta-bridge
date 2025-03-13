@@ -150,6 +150,18 @@ export class SupabaseService {
     }
     return table_data
   }
+
+  async getDatabaseTables():Promise<string[]> {
+    const { data, error } = await this.supabase
+      .from(process.env.VIEW_STRUCT)
+      .select('table_name')
+  
+    if (error) {
+      throw error;
+    }
+  
+    return data.map((row) => row.table_name);
+  }
   
 }
 
