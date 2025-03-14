@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import type {SupabaseClient} from '@supabase/supabase-js';
 import { createClient } from '@supabase/supabase-js';
 import { TDataArray, TTableStructure, TDataSeriesHead, TTableMetaData, AggregationOperations, TDataSeriesMetadata, TDataSeries, TDataSeriesRaw, TColumnNames, TTableData } from '@learners-analytica/drashta-types-ts';
-import * as dotenv from 'dotenv';
 
 type TDatabaseStructure = TTableStructure[];
 @Injectable()
@@ -124,7 +123,7 @@ export class SupabaseService {
     for (const column of columns) {
       const columnHead:TDataSeriesHead = await this.getColumnHeadData(table, column);
       const columnMeta:TDataSeriesMetadata = await this.getColumnMeta(table, column);
-      const columnDataPreview:unknown[] = await this.getColumnData(table, [column], PREVIEW_DATA_SIZE);
+      const columnDataPreview:unknown[] = await this.getDataAsValueArray(table, column, PREVIEW_DATA_SIZE);
       const dataSeriesItem: TDataSeries = {
         ...columnHead,
         column_avg: columnMeta.column_avg,
