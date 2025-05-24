@@ -19,4 +19,4 @@ Service for Drashta Demo's Data Retrieval System, Uses Supabase as Data Source
 
 `npm run start`
 
-open `localhost:3000`
+open [`localhost:3000`](https://localhost:3000)
